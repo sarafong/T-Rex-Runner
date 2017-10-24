@@ -43,8 +43,6 @@
 #define dino_width 21
 #define dino_height 20
 
-U8GLIB_NHD_C12864 u8g(13, 11, 10, 9, 8);	// SPI Com: SCK = 13, MOSI = 11, CS = 10, A0 = 9, RST = 8
-
 static unsigned char dino_bits[] = {
    0x00, 0xf0, 0x0f, 0x00, 0xd8, 0x1f, 0x00, 0xf8, 0x1f, 0x00, 0xf8, 0x1f,
    0x00, 0xf8, 0x01, 0x00, 0xf8, 0x03, 0x01, 0xfc, 0x0f, 0x03, 0x7e, 0x00,
@@ -52,14 +50,90 @@ static unsigned char dino_bits[] = {
    0xfc, 0x7f, 0x00, 0xf8, 0x3f, 0x00, 0xf0, 0x1f, 0x00, 0xe0, 0x1f, 0x00,
    0xc0, 0x0d, 0x00, 0xc0, 0x08, 0x00, 0x40, 0x08, 0x00, 0xc0, 0x18, 0x00 };
 
+//Constructor
+U8GLIB_NHD_C12864 u8g(13, 11, 10, 9, 8);  // SPI Com: SCK = 13, MOSI = 11, CS = 10, A0 = 9, RST = 8
+
+
+int analogToDigitalIN;
+int key=-1;
+int oldkey=-1;
+
+int down = 0;
+int jump = 0;
+int dinoY = 43;
+
+// Convert ADC value to key number
+//         4
+//         |
+//   0 --  1 -- 3
+//         |
+//         2
+
+int getKey(unsigned int input) {   
+    if (input < 100) return 0;
+    else  if (input < 300) return 1;
+    else  if (input < 500) return 2;
+    else  if (input < 700) return 3;
+    else  if (input < 900) return 4;    
+    else  return -1;
+}
+
+
+void keyPress(void) {
+  analogToDigitalIN = analogRead(0);    // read the value from the sensor  
+  key = getKey(analogToDigitalIN);   // convert into key press  
+  if (key != oldkey) {   // if keypress is detected
+    delay(50);    // wait for debounce time
+    analogToDigitalIN = analogRead(0);    // read the value from the sensor  
+    key = getKey(analogToDigitalIN);     // convert into key press
+    if (key != oldkey) {     
+      oldkey = key;
+      if (key >=0){
+         if ( key == 0 )    {
+                    
+         }
+         else if ( key == 1 ){
+          
+         }
+         else if ( key == 2 ){
+          
+         }
+         else if ( key == 3 ){
+          
+         }
+         else if ( key == 4 && dinoY == 44 ){
+          jump = 1;
+          down = 1;
+          key = 0;
+         } else {
+          
+         }
+      }
+    }
+  }
+ delay(100);
+}
+
+
+void moveDino(){
+  if ( jump == 1 || dinoY <= 43 ) {
+    jump = 0;
+    if ( dinoY >= 28 && down == 1 )
+      dinoY -= 1;
+    else {
+      down = 0;
+      dinoY += 1;
+    }
+  }
+}
 
 void draw(void) {
-  drawDino();
+  drawDino( dinoY );
   drawScore();
 }
 
-void drawDino(void){
-  u8g.drawXBM(1, 44 , dino_width, dino_height, dino_bits);
+void drawDino( int dinoY ){
+  u8g.drawXBM(1, dinoY, dino_width, dino_height, dino_bits);
 }
 
 void drawScore(void){
@@ -73,16 +147,20 @@ void drawScore(void){
 
 
 void setup(void) {
-
+  u8g.setRot180();
+  Serial.begin(9600);
 }
 
+
 void loop(void) {
+  
   u8g.firstPage();  
   do {
+    keyPress();
+    moveDino();
     draw();
   } while( u8g.nextPage() );
-  
-  // rebuild the picture after some delay
+
   delay(100);
 }
 
