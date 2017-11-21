@@ -1,10 +1,9 @@
 #include "U8glib.h"
 
 //Fix Cacti Collision
-//Fix First Cacti Bug? Looping
-//Difficulty Increase
 //Menu
 //Multiple Dino Bitmaps
+//High Score
 
 //--------------------Bitmaps--------------------//
 
@@ -69,47 +68,53 @@ static unsigned char gameover_bits[] = {
    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 
-//----------Constructor----------//
+//----------Constructor from U8GLIB----------//
 U8GLIB_NHD_C12864 u8g(13, 11, 10, 9, 8);  // SPI Com: SCK = 13, MOSI = 11, CS = 10, A0 = 9, RST = 8
 
 //----------Initializing Variables----------//
-unsigned long dinoTimeToMove = 0;
+unsigned long dinoTimeToMove = 0; //Used to space out time(millis) between draws/moves
 unsigned long dinoTimeToDraw = 0;
 
 String score;
-int analogToDigitalIN;
-int compensation = 0;
-int gameOver = 0;
+int input; //Joystick Input
+int compensation; //To compensate for extra time after each run (essentially "resets" the time)
+int gameOver;
 
-int down = 0;
-int jump = 0;
-int dinoY = 44;
-int cactiX1 = 130;
-int cactiX2 = cactiX1 + random(60, 110);
-int cactiX3 = cactiX2 + random(60, 110);
+int down, jump; //Boolean values to check the state of the dinosaur
+int dinoY, cactiX1, cactiX2; //Positions of objects
+int velocity; //Speed of entire game
 
-void reset(void) {
-  compensation = millis()/200;
+
+//--------------------Functions--------------------//
+
+//Set/Reset Loop for PlayAgain
+void reset() {
+  compensation = millis();
   gameOver = 0;
   down = 0;
   jump = 0;
   dinoY = 44;
+  velocity = (millis()-compensation)/10000 + 2;
   cactiX1 = 130;
-  cactiX2 = cactiX1 + random(60, 110);
-  cactiX3 = cactiX2 + random(60, 110);
+  cactiX2 = cactiX1 + random(70, 120);
 }
 
+//Deteching Joystick Interaction
 void keyPress(void) {
-  analogToDigitalIN = analogRead(0);    // read the value from the sensor
-  if ( analogToDigitalIN < 250 && analogToDigitalIN > 150 && gameOver == 1 ) reset();
-  else if ( dinoY == 44 && analogToDigitalIN < 850 && analogToDigitalIN > 800 ) {
+  input = analogRead(0);    
+  if ( input < 250 && input > 150 && gameOver == 1 ) 
+    reset(); //Corresponds to clicking the joystick
+  else if ( dinoY == 44 && input < 850 && input > 800 ) { //Corresponds to pushing up on the joystick
     jump = 1;
     down = 1;
   }
 }
 
+//-------Move Functions-------//
+
 void moveObjects() {
   if( millis() > dinoTimeToMove+50 ){
+    velocity = (millis()-compensation)/2000 + 2;
     moveDino();
     moveCactus();
     dinoTimeToMove = millis();  
@@ -117,32 +122,29 @@ void moveObjects() {
 }
 
 void moveDino(){
+  if ( dinoY > 44 ) dinoY = 44;
   if ( jump == 1 || dinoY <= 43 ) {
     jump = 0;
-    if ( dinoY >= 16 && down == 1 ) dinoY -= 2;
+    if ( dinoY >= 16 && down == 1 ) dinoY -= velocity;
     else {
       down = 0;
-      dinoY += 2;
+      dinoY += velocity;
     }
   }
 }
 
 void moveCactus(){
-  
-  cactiX1 -= 2;
-  cactiX2 -= 2;
-  cactiX3 -= 2;
-  //Serial.println(cactiX3);
-
-
+  cactiX1 -= velocity;
+  cactiX2 -= velocity;
   if ( cactiX1 <= -15 ) {
     cactiX1 = cactiX2;
-    cactiX2 = cactiX3;
-    cactiX3 = cactiX2 + random(50, 100);
+    cactiX2 = cactiX1 + random(70, 120);
   }
 }
 
-void draw(void) {
+//-------Draw Functions-------//
+
+void draw() {
   if( millis() > dinoTimeToDraw + 25 ){
     do {
       drawDinoCactus();
@@ -157,23 +159,17 @@ void drawDinoCactus( ){
   u8g.drawXBM(10, dinoY, dino_width, dino_height, dino_bits);
   u8g.drawXBM(cactiX1, 47, smallcactus_width, smallcactus_height, smallcactus_bits);
   u8g.drawXBM(cactiX2, 47, smallcactus_width, smallcactus_height, smallcactus_bits);
-  u8g.drawXBM(cactiX3, 47, smallcactus_width, smallcactus_height, smallcactus_bits);
 }
 
 void drawScore(void){
   char scoreBuff[50];
   if ( gameOver != 1 ) {
     score = "Score: ";
-    score += millis()/200 - compensation;
+    score += (millis()-compensation)/250;
   }
   score.toCharArray(scoreBuff, 50);
   u8g.setFont(u8g_font_courB08);
   u8g.drawStr( 55, 8, scoreBuff );
-}
-
-
-void collision(){
-  if ( cactiX1 <= 23 && cactiX1 + smallcactus_width >= 15 && dinoY+20 >= 50 ) gameOver = 1;
 }
 
 void playAgain(){
@@ -181,12 +177,17 @@ void playAgain(){
 }
 
 
+void collision(){
+  if ( cactiX1 <= 23 && cactiX1 + smallcactus_width >= 15 && dinoY+20 >= 50 ) gameOver = 1;
+}
+
+
 void setup(void) {
+  reset();
   u8g.setRot180();
   u8g.setContrast( 3 );
   Serial.begin(9600);
 }
-
 
 void loop(void) {
   u8g.firstPage();
