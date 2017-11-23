@@ -142,8 +142,6 @@ static unsigned char replay_bits[] = {
    0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 
-
-
 //----------Constructor from U8GLIB----------//
 U8GLIB_NHD_C12864 u8g(13, 11, 10, 9, 8);  // SPI Com: SCK = 13, MOSI = 11, CS = 10, A0 = 9, RST = 8
 
@@ -153,7 +151,7 @@ unsigned long dinoTimeToDraw = 0;
 
 String score;
 int highScore = 0;
-int multiplier;
+int multiplier; //Score multiplier
 
 int input; //Joystick Input
 bool ignoreRepeat = false; //Avoid Switch Bouncing
@@ -162,7 +160,7 @@ bool gameOver;
 bool menu = true;
 
 bool down, jump; //Boolean values to check the state of the dinosaur
-int dinoSwitch;
+int dinoSwitch; //Switch between dino bitmaps to simulate movement
 int dinoY, cactiX1, cactiX2; //Positions of objects
 int velocity; //Speed of entire game
 int difficulty; //How fast the velocity increases
@@ -193,13 +191,14 @@ void keyPress(void){
     menu = false;
     
     if ( input < 100 ) difficulty = 10000; //Left
-    else if ( input < 300 ) difficulty = random(2500,10000); //Click
+    else if ( input < 300 ) difficulty = random( 2500,10000 ); //Click
     else if ( input < 500 ) difficulty = 2500; //Down
     else if ( input < 700 ) difficulty = 5000; // Right
     else difficulty = 7500; //Up
+    
     multiplier = 15000/difficulty;
   } 
-  else if ( gameOver && (input < 200 || input > 600 && input < 700) ) { //Left -> PlayAgain // Right -> Menu
+  else if ( gameOver && ( input < 200 || input > 600 && input < 700 ) ) { //Left -> PlayAgain // Right -> Menu
     ignoreRepeat = false;
     reset();
     if ( !(input < 200) ) menu = true; //Pushing Right 
@@ -214,7 +213,7 @@ void keyPress(void){
 //Collision Detecting and Setting HighScore
 void collision(){
   if ( cactiX1 <= 23 && cactiX1 + smallcactus_width >= 15 && dinoY+20 >= 50 ) {
-    if ( (millis()-compensation)/250 > highScore && !gameOver ) highScore = (millis()-compensation)*multiplier/250; //Changes highscore if current score is greater
+    if ( (millis()-compensation)*multiplier/250 > highScore && !gameOver ) highScore = (millis()-compensation)*multiplier/250; //Changes highscore if current score is greater
     gameOver = true;
   }
 }
@@ -267,33 +266,35 @@ void draw(){
 }
 
 void drawDinoCactus( ){
-  if ( dinoY < 44 ) u8g.drawXBM(10, dinoY, standing_width, standing_height, standing_bits);
-  else if ( (millis()-compensation) % 16 > 9 ) u8g.drawXBM(10, dinoY, frontLeg_width, frontLeg_height, frontLeg_bits);
+  if ( dinoY < 44 ) u8g.drawXBM(10, dinoY, standing_width, standing_height, standing_bits); //While jumping don't change bitmap
+  else if ( (millis()-compensation) % 16 > 9 ) u8g.drawXBM(10, dinoY, frontLeg_width, frontLeg_height, frontLeg_bits); //Switch between bitmaps every 9 millis
   else u8g.drawXBM(10, dinoY, backLeg_width, backLeg_height, backLeg_bits);
-  u8g.drawXBM(cactiX1, 47, smallcactus_width, smallcactus_height, smallcactus_bits);
+  u8g.drawXBM(cactiX1, 47, smallcactus_width, smallcactus_height, smallcactus_bits); //Draw cacti
   u8g.drawXBM(cactiX2, 47, smallcactus_width, smallcactus_height, smallcactus_bits);
 }
 
 void drawScore(){
   char scoreBuff[50];
-  if ( menu ) {
+  if ( menu ) { //Print highscore on menu screen
     score = "HighS: ";
     score += highScore;
-  } else if ( !gameOver ) {
+  } else if ( !gameOver ) { //Increments score ONLY while playing
     score = "Score: ";
     score += (millis()-compensation) * multiplier/250;
   }
-  score.toCharArray(scoreBuff, 50);
+  score.toCharArray(scoreBuff, 50); //Draws string to screen
   u8g.setFont(u8g_font_courB08);
   u8g.drawStr( 55, 8, scoreBuff );
 }
 
-void playAgain(){
+//Draws Game Over Screen
+void playAgain(){ 
   u8g.drawXBM(14, 14, gameover_width, gameover_height, gameover_bits);
   u8g.drawXBM(23, 30, replay_width, replay_height, replay_bits);
   u8g.drawXBM(70, 30, menu_width, menu_height, menu_bits);
 }
 
+//Draws Menu Screen
 void menuScreen(){
   u8g.drawXBM(26, 30, easy_width, easy_height, easy_bits);
   u8g.drawXBM(49, 12, medium_width, medium_height, medium_bits);
@@ -306,15 +307,16 @@ void menuScreen(){
 
 void setup(void){
   reset();
-  u8g.setRot180();
+  u8g.setRot180(); //Flips screen
   u8g.setContrast( 3 );
   Serial.begin(9600);
 }
 
+//Main loop
 void loop(void){
   u8g.firstPage();
   keyPress();
-  if ( !gameOver && !menu ) moveObjects();
+  if ( !gameOver && !menu ) moveObjects(); //Only move objects while not on menu or game over screen
   draw();
   collision();
 }
